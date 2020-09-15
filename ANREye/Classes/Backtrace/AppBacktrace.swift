@@ -10,7 +10,7 @@ import Foundation
 
 class AppBacktrace: NSObject {
     
-    
+
     class func with(thread: Thread) -> String {
         let machThread = self.bs_machThread(from: thread)
         return BSBacktraceLogger.backtrace(ofMachthread: machThread)
@@ -38,6 +38,7 @@ class AppBacktrace: NSObject {
         for i in 0..<thread_count {
             let index = Int(i)
             let bt = BSBacktraceLogger.backtrace(ofMachthread: threads![index])
+            parseMangledSwiftSymbol(bt!, isType: false)
             resultString.append(bt!)
         }
         
