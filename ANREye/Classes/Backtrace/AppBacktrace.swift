@@ -9,19 +9,35 @@
 import Foundation
 
 class AppBacktrace: NSObject {
-    
-
-    class func with(thread: Thread) -> String {
-        let machThread = self.bs_machThread(from: thread)
-        return BSBacktraceLogger.backtrace(ofMachthread: machThread)
+    class func with(thread: thread_t) -> String {
+        let data: [StackModel] = BSBacktraceLogger.backtrace(ofMachthread: thread) as? [StackModel] ?? [StackModel()]
+        var resultString: String = ""
+        for model in data {
+            if model.dli_fname.hasPrefix("-") {
+                
+            } else {
+                let name = try? parseMangledSwiftSymbol(model.dli_sname)
+                if let tem = name {
+                    if tem.children.count > 0 {
+                        model.dli_sname = tem.description
+                    }
+                }
+            }
+            resultString = resultString.appendingFormat("%@ + %lu", model.dli_sname, model.offset)
+            resultString.append(contentsOf: "\n")
+            debugPrint(resultString)
+        }
+        return resultString
     }
     
     class func currentThread() -> String {
-        return self.with(thread: Thread.current)
+        let machThread = self.bs_machThread(from: Thread.current)
+        return self.with(thread: machThread)
     }
     
     class func mainThread() -> String {
-        return self.with(thread: Thread.main)
+        let machThread = self.bs_machThread(from: Thread.main)
+        return self.with(thread: machThread)
     }
     
     class func allThread() -> String {
@@ -37,9 +53,9 @@ class AppBacktrace: NSObject {
         
         for i in 0..<thread_count {
             let index = Int(i)
-            let bt = BSBacktraceLogger.backtrace(ofMachthread: threads![index])
-            parseMangledSwiftSymbol(bt!, isType: false)
-            resultString.append(bt!)
+            let string = self.with(thread: threads![index])
+            debugPrint(string)
+            resultString.append(string)
         }
         
         return resultString
@@ -95,3 +111,4 @@ class AppBacktrace: NSObject {
         return mach_thread_self()
     }
 }
+

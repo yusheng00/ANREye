@@ -9,8 +9,7 @@
 import Foundation
 
 
-public class SwiftTool {
-    public static func parseMangledSwiftSymbol(_ mangled: String, isType: Bool = false) throws -> SwiftSymbol {
+public func parseMangledSwiftSymbol(_ mangled: String, isType: Bool = false) throws -> SwiftSymbol {
         return try parseMangledSwiftSymbol(mangled.unicodeScalars, isType: isType)
     }
 
@@ -21,7 +20,7 @@ public class SwiftTool {
     ///   - isType: if true, no prefix is parsed and, on completion, the first item on the parse stack is returned.
     /// - Returns: the successfully parsed result
     /// - Throws: a SwiftSymbolParseError error that contains parse position when the error occurred.
-    public static func parseMangledSwiftSymbol<C: Collection>(_ mangled: C, isType: Bool = false, symbolicReferenceResolver: ((Int32, Int) throws -> SwiftSymbol)? = nil) throws -> SwiftSymbol where C.Iterator.Element == UnicodeScalar {
+public func parseMangledSwiftSymbol<C: Collection>(_ mangled: C, isType: Bool = false, symbolicReferenceResolver: ((Int32, Int) throws -> SwiftSymbol)? = nil) throws -> SwiftSymbol where C.Iterator.Element == UnicodeScalar {
         var demangler = Demangler(scalars: mangled)
         demangler.symbolicReferenceResolver = symbolicReferenceResolver
         if isType {
@@ -32,7 +31,6 @@ public class SwiftTool {
             return try demangler.demangleSwift3TopLevelSymbol()
         }
     }
-}
 /// This is likely to be the primary entry point to this file. Pass a string containing a Swift mangled symbol or type, get a parsed SwiftSymbol structure which can then be directly examined or printed.
 ///
 /// - Parameters:
@@ -4255,7 +4253,9 @@ fileprivate struct SymbolPrinter {
                 postfixContext = context
             } else {
                 let currentPos = target.count
-                postfixContext = printName(context, asPrefixContext: true)
+                if context.children.count > 0{
+                    postfixContext = printName(context, asPrefixContext: true)
+                }
                 if target.count != currentPos {
                     target.write(".")
                 }
@@ -4274,7 +4274,9 @@ fileprivate struct SymbolPrinter {
             } else {
                 if let one = name.children.at(1) {
                     if one.kind != .privateDeclName {
-                        _ = printName(one)
+                        if one.children.count > 0 {
+                            _ = printName(one)
+                        }
                     }
                     if let pdn = name.children.first(where: { $0.kind == .privateDeclName }) {
                         _ = printName(pdn)
@@ -5098,3 +5100,4 @@ fileprivate extension Array {
         }
     }
 }
+

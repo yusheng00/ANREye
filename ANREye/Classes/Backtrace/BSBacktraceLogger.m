@@ -75,20 +75,25 @@ typedef struct BSStackFrameEntry{
     const uintptr_t return_address;
 } BSStackFrameEntry;
 
+@implementation StackModel
+
+@end
+
 @implementation BSBacktraceLogger
 
-+ (NSString *)backtraceOfMachthread:(thread_t)thread {
-    return _bs_backtraceOfThread(thread);
++ (NSArray *)backtraceOfMachthread:(thread_t)thread {
+    return [BSBacktraceLogger bs_backtraceOfThread:thread];
 }
 
 #pragma -mark Get call backtrace of a mach_thread
-NSString *_bs_backtraceOfThread(thread_t thread) {
++(NSArray *)bs_backtraceOfThread:(thread_t)thread {
     uintptr_t backtraceBuffer[50];
     int i = 0;
     NSMutableString *resultString = [[NSMutableString alloc] initWithFormat:@"Backtrace of Thread %u:\n", thread];
     
     _STRUCT_MCONTEXT machineContext;
     if(!bs_fillThreadStateIntoMachineContext(thread, &machineContext)) {
+        return [NSArray array];
         return [NSString stringWithFormat:@"Fail to get information about thread: %u", thread];
     }
     
@@ -103,6 +108,7 @@ NSString *_bs_backtraceOfThread(thread_t thread) {
     }
     
     if(instructionAddress == 0) {
+        return [NSArray array];
         return @"Fail to get instruction address";
     }
     
@@ -110,6 +116,7 @@ NSString *_bs_backtraceOfThread(thread_t thread) {
     const uintptr_t framePtr = bs_mach_framePointer(&machineContext);
     if(framePtr == 0 ||
        bs_mach_copyMem((void *)framePtr, &frame, sizeof(frame)) != KERN_SUCCESS) {
+        return [NSArray array];
         return @"Fail to get frame pointer";
     }
     
@@ -123,37 +130,53 @@ NSString *_bs_backtraceOfThread(thread_t thread) {
     }
     
     int backtraceLength = i;
+    NSMutableArray *resultArray = [NSMutableArray array];
     Dl_info symbolicated[backtraceLength];
     bs_symbolicate(backtraceBuffer, symbolicated, backtraceLength, 0);
     for (int i = 0; i < backtraceLength; ++i) {
-        [resultString appendFormat:@"%@", bs_logBacktraceEntry(i, backtraceBuffer[i], &symbolicated[i])];
+        StackModel *model = [[StackModel alloc] init];
+        Dl_info dlInfo = symbolicated[i];
+        
+        char faddrBuff[20];
+        char saddrBuff[20];
+        
+        const char* fname = bs_lastPathEntry(dlInfo.dli_fname);
+        if(fname == NULL) {
+            sprintf(faddrBuff, POINTER_FMT, (uintptr_t)dlInfo.dli_fbase);
+            fname = faddrBuff;
+        }
+        
+        uintptr_t offset = backtraceBuffer[i] - (uintptr_t)dlInfo.dli_saddr;
+        const char* sname = dlInfo.dli_sname;
+        if(sname == NULL) {
+            sprintf(saddrBuff, POINTER_SHORT_FMT, (uintptr_t)dlInfo.dli_fbase);
+            sname = saddrBuff;
+            offset = backtraceBuffer[i] - (uintptr_t)dlInfo.dli_fbase;
+        }
+        
+        if (dlInfo.dli_fname) {
+            model.dli_fname = [NSString stringWithCString:dlInfo.dli_fname encoding:NSUTF8StringEncoding];
+        }
+        if (dlInfo.dli_sname) {
+            model.dli_sname = [NSString stringWithCString:dlInfo.dli_sname encoding:NSUTF8StringEncoding];
+        }
+        if (dlInfo.dli_fbase) {
+            model.dli_fbase = (__bridge id _Nonnull)(dlInfo.dli_fbase);
+        }
+        if (dlInfo.dli_saddr) {
+            model.dli_saddr = (__bridge id _Nonnull)(dlInfo.dli_saddr);
+        }
+        model.offset = offset;
+        model.address = backtraceBuffer[i];
+        [resultArray addObject:model];
+
     }
     [resultString appendFormat:@"\n"];
-    return [resultString copy];
+    return  [resultArray copy];
+//    return [resultString copy];
 }
 
 #pragma -mark GenerateBacbsrackEnrty
-NSString* bs_logBacktraceEntry(const int entryNum,
-                               const uintptr_t address,
-                               const Dl_info* const dlInfo) {
-    char faddrBuff[20];
-    char saddrBuff[20];
-    
-    const char* fname = bs_lastPathEntry(dlInfo->dli_fname);
-    if(fname == NULL) {
-        sprintf(faddrBuff, POINTER_FMT, (uintptr_t)dlInfo->dli_fbase);
-        fname = faddrBuff;
-    }
-    
-    uintptr_t offset = address - (uintptr_t)dlInfo->dli_saddr;
-    const char* sname = dlInfo->dli_sname;
-    if(sname == NULL) {
-        sprintf(saddrBuff, POINTER_SHORT_FMT, (uintptr_t)dlInfo->dli_fbase);
-        sname = saddrBuff;
-        offset = address - (uintptr_t)dlInfo->dli_fbase;
-    }
-    return [NSString stringWithFormat:@"%-30s  0x%08" PRIxPTR " %s + %lu\n" ,fname, (uintptr_t)address, sname, offset];
-}
 
 const char* bs_lastPathEntry(const char* const path) {
     if(path == NULL) {
@@ -355,3 +378,4 @@ uintptr_t bs_segmentBaseOfImageIndex(const uint32_t idx) {
 }
 
 @end
+
