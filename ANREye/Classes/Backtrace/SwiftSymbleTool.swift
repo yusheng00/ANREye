@@ -4253,9 +4253,7 @@ fileprivate struct SymbolPrinter {
                 postfixContext = context
             } else {
                 let currentPos = target.count
-                if context.children.count > 0{
-                    postfixContext = printName(context, asPrefixContext: true)
-                }
+                postfixContext = printName(context, asPrefixContext: true)
                 if target.count != currentPos {
                     target.write(".")
                 }
@@ -4274,9 +4272,7 @@ fileprivate struct SymbolPrinter {
             } else {
                 if let one = name.children.at(1) {
                     if one.kind != .privateDeclName {
-                        if one.children.count > 0 {
-                            _ = printName(one)
-                        }
+                        _ = printName(one)
                     }
                     if let pdn = name.children.first(where: { $0.kind == .privateDeclName }) {
                         _ = printName(pdn)
